@@ -1,6 +1,5 @@
 import sys
 
-
 class Calculator:
     def __init__(self):
         pass
@@ -12,6 +11,10 @@ class Calculator:
         return a - b
     
     def calculate(self, expression):
+        if not expression:
+            sys.stderr.write("Erro: Expressão vazia.\n")
+            return None
+        
         expression = expression.replace(' ','')
         number = []
         operation = []
@@ -30,11 +33,15 @@ class Calculator:
 
         result = number[0]
 
-        for i, op in enumerate(operation):
-            if op == "+":
-                result = self.add(result, number[i+1])
-            elif op == "-":
-                result = self.subtract(result, number[i+1])
+        if len(operation) == 0 and len(number) > 1:
+            sys.stderr.write("Erro: Operação não especificada.\n")
+            return None
+        else:
+            for i, op in enumerate(operation):
+                if op == "+":
+                    result = self.add(result, number[i+1])
+                elif op == "-":
+                    result = self.subtract(result, number[i+1])
 
         return result    
 
@@ -47,4 +54,5 @@ if __name__ == "__main__":
 
     result = Calculator().calculate(expression)
 
-    print(result)
+    if result is not None:
+        print(result)
