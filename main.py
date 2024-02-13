@@ -33,7 +33,7 @@ class Calculator:
 
         result = number[0]
 
-        if len(operation) == 0 and len(number) > 1:
+        if len(operation) == 0:
             sys.stderr.write("Erro: Operação não especificada.\n")
             return None
         else:
