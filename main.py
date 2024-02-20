@@ -5,9 +5,6 @@ class Token:
         self.type = type
         self.value = value
 
-    def __repr__(self):
-        return f"Token({self.type}, {self.value})"
-
 class Tokenizer:
     def __init__(self, source):
         self.source = source
