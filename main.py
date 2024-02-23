@@ -39,6 +39,9 @@ class Parser:
         result = 0
         has_operator = False
         tokenizer.selectNext()
+        if tokenizer.next.type in ['PLUS', 'MINUS']:
+            sys.stderr.write("Expression cannot start with an operator\n")
+            sys.exit(1)
         while tokenizer.next.type != 'EOF':
             if tokenizer.next.type == 'INT':
                 result += tokenizer.next.value
