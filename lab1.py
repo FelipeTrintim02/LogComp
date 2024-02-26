@@ -29,59 +29,47 @@ class Tokenizer:
         elif self.source[self.position] == "-":
             self.next = Token("MINUS", None)
             self.position += 1
-        elif self.source[self.position] == "*":
-            self.next = Token("MULT", None)
-            self.position += 1
-        elif self.source[self.position] == "/":
-            self.next = Token("DIV", None)
-            self.position += 1
         else:
             sys.stderr.write(f"Unexpected character: {self.source[self.position]}\n")
             sys.exit(1)
 
 class Parser:
     @staticmethod
-    def parseTerm(tokenizer):
-        if tokenizer.next.type == 'INT':
-            result = tokenizer.next.value
-            tokenizer.selectNext()
-            while tokenizer.next.type in ['MULT', 'DIV']:
-                if tokenizer.next.type == 'MULT':
-                    tokenizer.selectNext()
-                    if tokenizer.next.type == 'INT':
-                        result *= tokenizer.next.value
-                    else:
-                        sys.stderr.write(f"Expected number after *\n")
-                        sys.exit(1)
-                elif tokenizer.next.type == 'DIV':
-                    tokenizer.selectNext()
-                    if tokenizer.next.type == 'INT':
-                        result //= tokenizer.next.value
-                    else:
-                        sys.stderr.write(f"Expected number after /\n")
-                        sys.exit(1)
-                tokenizer.selectNext()
-            return result
-        else:
-            sys.stderr.write(f"Expected number\n")
-            sys.exit(1)
-
-    @staticmethod
     def parseExpression(tokenizer):
-        result = Parser.parseTerm(tokenizer)
-        while tokenizer.next.type in ['PLUS', 'MINUS']:
-            if tokenizer.next.type == 'PLUS':
+        result = 0
+        has_operator = False
+        tokenizer.selectNext()
+        if tokenizer.next.type in ['PLUS', 'MINUS']:
+            sys.stderr.write("Expression cannot start with an operator\n")
+            sys.exit(1)
+        while tokenizer.next.type != 'EOF':
+            if tokenizer.next.type == 'INT':
+                result += tokenizer.next.value
                 tokenizer.selectNext()
-                result += Parser.parseTerm(tokenizer)
+                if tokenizer.next.type == 'INT':
+                    sys.stderr.write("It is not possible to have space between two numbers\n")
+                    sys.exit(1)
+            elif tokenizer.next.type == 'PLUS':
+                has_operator = True
+                tokenizer.selectNext()
+                result += tokenizer.next.value
+                tokenizer.selectNext()
             elif tokenizer.next.type == 'MINUS':
+                has_operator = True
                 tokenizer.selectNext()
-                result -= Parser.parseTerm(tokenizer)
+                result -= tokenizer.next.value
+                tokenizer.selectNext()
+            else:
+                sys.stderr.write(f"Unexpected token: {tokenizer.next}\n")
+                sys.exit(1)
+        if not has_operator:
+            sys.stderr.write("Expression must contain at least one operator (+ or -)\n")
+            sys.exit(1)
         return result
 
     @staticmethod
     def run(code):
         tokenizer = Tokenizer(code)
-        tokenizer.selectNext()  # Initialize the tokenizer
         result = Parser.parseExpression(tokenizer)
         if tokenizer.next.type != 'EOF':
             sys.stderr.write("Unexpected tokens after expression\n")
