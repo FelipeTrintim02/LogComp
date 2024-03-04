@@ -35,17 +35,37 @@ class Tokenizer:
         elif self.source[self.position] == "/":
             self.next = Token("DIV", None)
             self.position += 1
-        elif self.source[self.position] == "(":
-            self.next = Token("LPAREN", None)
-            self.position += 1
-        elif self.source[self.position] == ")":
-            self.next = Token("RPAREN", None)
-            self.position += 1
         else:
             sys.stderr.write(f"Unexpected character: {self.source[self.position]}\n")
             sys.exit(1)
 
 class Parser:
+    @staticmethod
+    def parseTerm(tokenizer):
+        if tokenizer.next.type == 'INT':
+            result = tokenizer.next.value
+            tokenizer.selectNext()
+            while tokenizer.next.type in ['MULT', 'DIV']:
+                if tokenizer.next.type == 'MULT':
+                    tokenizer.selectNext()
+                    if tokenizer.next.type == 'INT':
+                        result *= tokenizer.next.value
+                    else:
+                        sys.stderr.write(f"Expected number after *\n")
+                        sys.exit(1)
+                elif tokenizer.next.type == 'DIV':
+                    tokenizer.selectNext()
+                    if tokenizer.next.type == 'INT':
+                        result //= tokenizer.next.value
+                    else:
+                        sys.stderr.write(f"Expected number after /\n")
+                        sys.exit(1)
+                tokenizer.selectNext()
+            return result
+        else:
+            sys.stderr.write(f"Expected number\n")
+            sys.exit(1)
+
     @staticmethod
     def parseExpression(tokenizer):
         result = Parser.parseTerm(tokenizer)
@@ -57,45 +77,6 @@ class Parser:
                 tokenizer.selectNext()
                 result -= Parser.parseTerm(tokenizer)
         return result
-
-    @staticmethod
-    def parseTerm(tokenizer):
-        result = Parser.parseFactor(tokenizer)
-        while tokenizer.next.type in ['MULT', 'DIV']:
-            if tokenizer.next.type == 'MULT':
-                tokenizer.selectNext()
-                result *= Parser.parseFactor(tokenizer)
-            elif tokenizer.next.type == 'DIV':
-                tokenizer.selectNext()
-                result //= Parser.parseFactor(tokenizer)
-        return result
-
-    @staticmethod
-    def parseFactor(tokenizer):
-        if tokenizer.next.type == 'INT':
-            result = tokenizer.next.value
-            tokenizer.selectNext()
-            return result
-        elif tokenizer.next.type == 'PLUS':
-            tokenizer.selectNext()
-            result += Parser.parseFactor(tokenizer)
-            return result
-        elif tokenizer.next.type == 'MINUS':
-            tokenizer.selectNext()
-            result -= Parser.parseFactor(tokenizer)
-            return result
-        elif tokenizer.next.type == 'LPAREN':
-            tokenizer.selectNext()
-            result = Parser.parseExpression(tokenizer)
-            if tokenizer.next.type != 'RPAREN':
-                sys.stderr.write(f"Expected )\n")
-                sys.exit(1)
-            tokenizer.selectNext()
-            return result
-        else:
-            sys.stderr.write(f"Expected number or (expression)\n")
-            sys.exit(1)
-
 
     @staticmethod
     def run(code):
