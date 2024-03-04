@@ -78,12 +78,10 @@ class Parser:
             return result
         elif tokenizer.next.type == 'PLUS':
             tokenizer.selectNext()
-            result += Parser.parseFactor(tokenizer)
-            return result
+            return Parser.parseFactor(tokenizer)
         elif tokenizer.next.type == 'MINUS':
             tokenizer.selectNext()
-            result -= Parser.parseFactor(tokenizer)
-            return result
+            return -Parser.parseFactor(tokenizer)
         elif tokenizer.next.type == 'LPAREN':
             tokenizer.selectNext()
             result = Parser.parseExpression(tokenizer)
@@ -95,7 +93,6 @@ class Parser:
         else:
             sys.stderr.write(f"Expected number or (expression)\n")
             sys.exit(1)
-
 
     @staticmethod
     def run(code):
