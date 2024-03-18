@@ -37,9 +37,9 @@ class Tokenizer:
                 number += self.source[self.position]
                 self.position += 1
             self.next = Token('INT', int(number))
-        elif self.source[self.position].isalpha():
+        elif self.source[self.position].isalpha() or self.source[self.position] == "_":
             identifier = ''
-            while self.position < len(self.source) and self.source[self.position].isalnum():
+            while self.position < len(self.source) and (self.source[self.position].isalnum() or self.source[self.position] == "_"):
                 identifier += self.source[self.position]
                 self.position += 1
             if identifier in self.reserved:
