@@ -18,14 +18,8 @@ class Tokenizer:
         self.source = filtered_source
         self.position = 0
         self.next = None
-        self.reserved = ['print']
 
     def selectNext(self):
-        if self.position < len(self.source) and self.source[self.position] == "\n":
-            self.next = Token("NEWLINE", None)
-            self.position += 1
-            return
-
         while self.position < len(self.source) and self.source[self.position].isspace():
             self.position += 1
 
@@ -37,18 +31,6 @@ class Tokenizer:
                 number += self.source[self.position]
                 self.position += 1
             self.next = Token('INT', int(number))
-        elif self.source[self.position].isalpha():
-            identifier = ''
-            while self.position < len(self.source) and self.source[self.position].isalnum():
-                identifier += self.source[self.position]
-                self.position += 1
-            if identifier in self.reserved:
-                self.next = Token(identifier.upper(), None)
-            else:
-                self.next = Token('IDENTIFIER', identifier)
-        elif self.source[self.position] == "=":
-            self.next = Token("ASSIGN", None)
-            self.position += 1
         elif self.source[self.position] == "+":
             self.next = Token("PLUS", None)
             self.position += 1
@@ -84,125 +66,41 @@ class BinOp(Node):
     def __init__(self, value, children):
         super().__init__(value, children)
 
-    def evaluate(self, st):
+    def evaluate(self):
         if self.value == '+':
-            return self.children[0].evaluate(st) + self.children[1].evaluate(st)
+            return self.children[0].evaluate() + self.children[1].evaluate()
         elif self.value == '-':
-            return self.children[0].evaluate(st) - self.children[1].evaluate(st)
+            return self.children[0].evaluate() - self.children[1].evaluate()
         elif self.value == '*':
-            return self.children[0].evaluate(st) * self.children[1].evaluate(st)
+            return self.children[0].evaluate() * self.children[1].evaluate()
         elif self.value == '/':
-            return self.children[0].evaluate(st) // self.children[1].evaluate(st)
+            return self.children[0].evaluate() // self.children[1].evaluate()
         
 class UnOp(Node):
     def __init__(self, value, children):
         super().__init__(value, children)
 
-    def evaluate(self, st):
+    def evaluate(self):
         if self.value == '+':
-            return self.children[0].evaluate(st)
+            return self.children[0].evaluate()
         elif self.value == '-':
-            return -self.children[0].evaluate(st)
+            return -self.children[0].evaluate()
         
 class IntVal(Node):
     def __init__(self, value):
         super().__init__(value, [])
 
-    def evaluate(self, st):
+    def evaluate(self):
         return self.value
     
 class NoOp(Node):
     def __init__(self):
         super().__init__(None, [])
 
-    def evaluate(self, st):
+    def evaluate(self):
         pass
 
-class Block(Node):
-    def __init__(self, children):
-        super().__init__(None, children)
-
-    def evaluate(self, st):
-        for child in self.children:
-            child.evaluate(st)
-
-class Identifier(Node):
-    def __init__(self, value):
-        super().__init__(value, [])
-
-    def evaluate(self, st):
-        return st.getter(self.value)
-    
-class Assignment(Node):
-    def __init__(self, children):
-        super().__init__(None, children)
-
-    def evaluate(self, st):
-        st.setter(self.children[0].value, self.children[1].evaluate(st))
-
-class Print(Node):
-    def __init__(self, children):
-        super().__init__(None, children)
-
-    def evaluate(self, st):
-        print(self.children[0].evaluate(st))
-
-class SymbolTable:
-    def __init__(self):
-        self.table = {}
-
-    def setter(self, key, value):
-        self.table[key] = value
-
-    def getter(self, key):
-        return self.table[key]
-
 class Parser:
-    @staticmethod
-    def parseStatement(tokenizer):
-        if tokenizer.next.type == 'IDENTIFIER':
-            identifier = Identifier(tokenizer.next.value)
-            tokenizer.selectNext()
-            if tokenizer.next.type != 'ASSIGN':
-                sys.stderr.write(f"Expected =\n")
-                sys.exit(1)
-            tokenizer.selectNext()
-            expression = Parser.parseExpression(tokenizer)
-            if tokenizer.next.type != 'EOF' and tokenizer.next.type != 'NEWLINE':
-                sys.stderr.write(f"Expected \\n\n")
-                sys.exit(1)
-            return Assignment([identifier, expression])
-        elif tokenizer.next.type == 'PRINT':
-            tokenizer.selectNext()
-            if tokenizer.next.type != 'LPAREN':
-                sys.stderr.write(f"Expected (\n")
-                sys.exit(1)
-            tokenizer.selectNext()
-            expression = Parser.parseExpression(tokenizer)
-            if tokenizer.next.type != 'RPAREN':
-                sys.stderr.write(f"Expected )\n")
-                sys.exit(1)
-            tokenizer.selectNext()
-            if tokenizer.next.type != 'EOF' and tokenizer.next.type != 'NEWLINE':
-                sys.stderr.write(f"Expected \\n\n")
-                sys.exit(1)
-            return Print([expression])
-        elif tokenizer.next.type == 'NEWLINE':
-            tokenizer.selectNext()
-            return NoOp()
-        else:
-            sys.stderr.write(f"Expected identifier or print\n")
-            sys.exit(1)
-    
-    @staticmethod
-    def parseBlock(tokenizer):
-        statements = []
-        while tokenizer.next.type != 'EOF':
-            statement = Parser.parseStatement(tokenizer)
-            if not isinstance(statement, NoOp):
-                statements.append(statement)
-        return Block(statements)
-
     @staticmethod
     def parseExpression(tokenizer):
         result = Parser.parseTerm(tokenizer)
@@ -233,10 +131,6 @@ class Parser:
             result = tokenizer.next.value
             tokenizer.selectNext()
             return IntVal(result)
-        elif tokenizer.next.type == 'IDENTIFIER':
-            result = tokenizer.next.value
-            tokenizer.selectNext()
-            return Identifier(result)
         elif tokenizer.next.type == 'PLUS':
             tokenizer.selectNext()
             return UnOp('+', [Parser.parseFactor(tokenizer)])
@@ -257,11 +151,11 @@ class Parser:
 
 
     @staticmethod
-    def run(code, st):
+    def run(code):
         tokenizer = Tokenizer(code)
         tokenizer.selectNext()  # Initialize the tokenizer
-        result = Parser.parseBlock(tokenizer)
-        result = result.evaluate(st)
+        result = Parser.parseExpression(tokenizer)
+        result = result.evaluate()
         if tokenizer.next.type != 'EOF':
             sys.stderr.write("Unexpected tokens after expression\n")
             sys.exit(1)
@@ -281,8 +175,12 @@ if __name__ == "__main__":
     try:
         with open(filename, 'r') as file:
             code = file.read()
-        st = SymbolTable()
-        result = Parser.run(code, st)
+
+        result = Parser.run(code)
+        print(result)
     except FileNotFoundError:
         sys.stderr.write(f"Error: File {filename} not found\n")
+        sys.exit(1)
+    except Exception as e:
+        sys.stderr.write(f"Error: {e}\n")
         sys.exit(1)
