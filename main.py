@@ -1,5 +1,6 @@
 import sys
 from abc import abstractmethod
+import re
 
 class Token:
     def __init__(self, type, value):
@@ -9,24 +10,21 @@ class Token:
 class PrePro:
     @staticmethod
     def filter(expression):
-        whitoutComments = expression.split("--")[0]
-        return whitoutComments
+        return re.sub(r'--.*', '', expression)
 
 class Tokenizer:
     def __init__(self, source):
-        filtered_source = PrePro.filter(source)
-        self.source = filtered_source
+        self.source = source
         self.position = 0
         self.next = None
         self.reserved = ['print']
 
     def selectNext(self):
-        if self.position < len(self.source) and self.source[self.position] == "\n":
-            self.next = Token("NEWLINE", None)
-            self.position += 1
-            return
-
         while self.position < len(self.source) and self.source[self.position].isspace():
+            if self.source[self.position] == "\n":
+                self.next = Token("NEWLINE", None)
+                self.position += 1
+                return
             self.position += 1
 
         if self.position >= len(self.source):
@@ -171,6 +169,7 @@ class Parser:
             if tokenizer.next.type != 'EOF' and tokenizer.next.type != 'NEWLINE':
                 sys.stderr.write(f"Expected \\n\n")
                 sys.exit(1)
+            tokenizer.selectNext()
             return Assignment([identifier, expression])
         elif tokenizer.next.type == 'PRINT':
             tokenizer.selectNext()
@@ -186,6 +185,7 @@ class Parser:
             if tokenizer.next.type != 'EOF' and tokenizer.next.type != 'NEWLINE':
                 sys.stderr.write(f"Expected \\n\n")
                 sys.exit(1)
+            tokenizer.selectNext() 
             return Print([expression])
         elif tokenizer.next.type == 'NEWLINE':
             tokenizer.selectNext()
@@ -282,6 +282,7 @@ if __name__ == "__main__":
         with open(filename, 'r') as file:
             code = file.read()
         st = SymbolTable()
+        code = PrePro.filter(code)
         result = Parser.run(code, st)
     except FileNotFoundError:
         sys.stderr.write(f"Error: File {filename} not found\n")
