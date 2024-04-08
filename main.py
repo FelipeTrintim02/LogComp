@@ -101,6 +101,12 @@ class BinOp(Node):
             return self.children[0].evaluate(st) * self.children[1].evaluate(st)
         elif self.value == '/':
             return self.children[0].evaluate(st) // self.children[1].evaluate(st)
+        elif self.value == '==':
+            return self.children[0].evaluate(st) == self.children[1].evaluate(st)
+        elif self.value == '>':
+            return self.children[0].evaluate(st) > self.children[1].evaluate(st)
+        elif self.value == '<':
+            return self.children[0].evaluate(st) < self.children[1].evaluate(st)
         
 class UnOp(Node):
     def __init__(self, value, children):
@@ -161,7 +167,8 @@ class While(Node):
 
     def evaluate(self, st):
         while self.children[0].evaluate(st):
-            self.children[1].evaluate(st)
+            for child in self.children[1]:
+                child.evaluate(st)
             
 class If(Node):
     def __init__(self, children):
@@ -178,7 +185,7 @@ class Read(Node):
         super().__init__(None, children)
 
     def evaluate(self, st):
-        return IntVal(int(input()))
+        return self.children[0]
 
 class SymbolTable:
     def __init__(self):
@@ -268,12 +275,15 @@ class Parser:
                 sys.stderr.write(f"Expected \\n\n")
                 sys.exit(1)
             tokenizer.selectNext()
-            statement = Parser.parseStatement(tokenizer)
+            statements = []
+            while tokenizer.next.type != 'END':
+                statement = Parser.parseStatement(tokenizer)
+                statements.append(statement)
             if tokenizer.next.type != 'END':
                 sys.stderr.write(f"Expected end\n")
                 sys.exit(1)
             tokenizer.selectNext()
-            return While([expression, statement])
+            return While([expression, statements])
         elif tokenizer.next.type == 'IF':
             tokenizer.selectNext()
             expression = Parser.boolExpression(tokenizer)
@@ -286,7 +296,7 @@ class Parser:
                 sys.exit(1)
             tokenizer.selectNext()
             statement1 = Parser.parseStatement(tokenizer)
-            if tokenizer.next.type != 'ELSE' or tokenizer.next.type != 'END':
+            if tokenizer.next.type != 'ELSE' and tokenizer.next.type != 'END':
                 sys.stderr.write(f"Expected else\n")
                 sys.exit(1)
             if tokenizer.next.type == 'ELSE':
@@ -362,9 +372,9 @@ class Parser:
             return UnOp('not', [Parser.parseFactor(tokenizer)])
         elif tokenizer.next.type == 'LPAREN':
             tokenizer.selectNext()
-            result = Parser.parseExpression(tokenizer)
+            result = Parser.boolExpression(tokenizer)
             if tokenizer.next.type != 'RPAREN':
-                sys.stderr.write(f"Expected )\n")
+                sys.stderr.write(f"Expected )aaaaaa\n")
                 sys.exit(1)
             tokenizer.selectNext()
             return result
@@ -374,13 +384,11 @@ class Parser:
                 sys.stderr.write(f"Expected (\n")
                 sys.exit(1)
             tokenizer.selectNext()
-            result = Identifier(tokenizer.next.value)
-            tokenizer.selectNext()
             if tokenizer.next.type != 'RPAREN':
                 sys.stderr.write(f"Expected )\n")
                 sys.exit(1)
             tokenizer.selectNext()
-            return Read([result])
+            return Read([int(input())])
         else:
             sys.stderr.write(f"Expected number or (expression)\n")
             sys.exit(1)
