@@ -283,6 +283,9 @@ class Parser:
                 sys.stderr.write(f"Expected end\n")
                 sys.exit(1)
             tokenizer.selectNext()
+            if tokenizer.next.type != 'EOF' and tokenizer.next.type != 'NEWLINE':
+                sys.stderr.write(f"Expected \\n\n")
+                sys.exit(1)
             return While([expression, statements])
         elif tokenizer.next.type == 'IF':
             tokenizer.selectNext()
@@ -310,9 +313,15 @@ class Parser:
                     sys.stderr.write(f"Expected end\n")
                     sys.exit(1)
                 tokenizer.selectNext()
+                if tokenizer.next.type != 'EOF' and tokenizer.next.type != 'NEWLINE':
+                    sys.stderr.write(f"Expected \\n\n")
+                    sys.exit(1)
                 return If([expression, statement1, statement2])
             if tokenizer.next.type == 'END':
                 tokenizer.selectNext()
+                if tokenizer.next.type != 'EOF' and tokenizer.next.type != 'NEWLINE':
+                    sys.stderr.write(f"Expected \\n\n")
+                    sys.exit(1)
                 return If([expression, statement1, NoOp()])
         else:
             sys.stderr.write(f"Expected identifier or print\n")
