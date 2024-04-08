@@ -107,6 +107,10 @@ class BinOp(Node):
             return self.children[0].evaluate(st) > self.children[1].evaluate(st)
         elif self.value == '<':
             return self.children[0].evaluate(st) < self.children[1].evaluate(st)
+        elif self.value == 'or':
+            return self.children[0].evaluate(st) or self.children[1].evaluate(st)
+        elif self.value == 'and':
+            return self.children[0].evaluate(st) and self.children[1].evaluate(st)
         
 class UnOp(Node):
     def __init__(self, value, children):
