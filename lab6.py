@@ -17,7 +17,7 @@ class Tokenizer:
         self.source = source
         self.position = 0
         self.next = None
-        self.reserved = ['print', 'read', 'if', 'then', 'else', 'end', 'while', 'do', 'or', 'and', 'not', 'local']
+        self.reserved = ['print', 'read', 'if', 'then', 'else', 'end', 'while', 'do', 'or', 'and', 'not']
 
     def selectNext(self):
         while self.position < len(self.source) and self.source[self.position].isspace():
@@ -75,136 +75,66 @@ class Tokenizer:
         elif self.source[self.position] == "<":
             self.next = Token("LT", None)
             self.position += 1
-        elif self.source[self.position] == ".":
-            if self.position + 1 < len(self.source) and self.source[self.position + 1] == ".":
-                self.next = Token("CONCAT", None)
-                self.position += 2
-        elif self.source[self.position] == "\"":
-            self.position += 1
-            string_literal = ''
-            while self.position < len(self.source):
-                if self.source[self.position] == "\\":
-                    self.position += 1
-                    if self.position < len(self.source) and self.source[self.position] in "\"nt":
-                        if self.source[self.position] == "\"":
-                            string_literal += "\""
-                        elif self.source[self.position] == "n":
-                            string_literal += "\n"
-                        elif self.source[self.position] == "t":
-                            string_literal += "\t"
-                    else:
-                        string_literal += "\\"
-                        continue
-                elif self.source[self.position] == "\"":
-                    self.position += 1
-                    break
-                else:
-                    string_literal += self.source[self.position]
-                self.position += 1
-            else:
-                raise Exception("String literal not closed")
-            self.next = Token('STRING', string_literal)
         else:
             sys.stderr.write(f"Unexpected character: {self.source[self.position]}\n")
             sys.exit(1)
 
-class SymbolTable:
-    def __init__(self):
-        self.table = {}
-
-    def setter(self, key, value, typ):
-        self.table[key] = (value, typ)
-
-    def getter(self, key):
-        if key in self.table:
-            return self.table[key]
-        else:
-            raise ValueError(f"Variable {key} not declared")
-
 class Node:
-    def __init__(self, value, children):
+    def __init__(self, value : int, children):
         self.value = value
         self.children = children
 
-    def evaluate(self, st):
-        raise NotImplementedError("Must override evaluate")
+    @abstractmethod
+    def evaluate(self):
+        pass
 
 class BinOp(Node):
     def __init__(self, value, children):
         super().__init__(value, children)
 
     def evaluate(self, st):
-        left_val, left_type = self.children[0].evaluate(st)
-        right_val, right_type = self.children[1].evaluate(st)
-
-        if self.value in {'+', '-', '*', '/', 'and', 'or'}:
-            if left_type != 'int' or right_type != 'int':
-                raise TypeError(f"Arithmetic operations require integer types, got {left_type} and {right_type}")
-            if self.value == '+':
-                return (left_val + right_val, 'int')
-            elif self.value == '-':
-                return (left_val - right_val, 'int')
-            elif self.value == '*':
-                return (left_val * right_val, 'int')
-            elif self.value == '/':
-                return (left_val // right_val, 'int')
-            elif self.value == 'and':
-                return (left_val and right_val, 'int')
-            elif self.value == 'or':
-                return (left_val or right_val, 'int')
-
-        elif self.value in {'==', '>', '<'}:
-            if left_type != right_type:
-                raise TypeError(f"Comparison operations require matching types, got {left_type} and {right_type}")
-            if self.value == '==':
-                return (left_val == right_val, 'int')
-            elif self.value == '>':
-                return (left_val > right_val, 'int')
-            elif self.value == '<':
-                return (left_val < right_val, 'int')
-
-        elif self.value == '..':
-            return (str(left_val) + str(right_val), 'string')
-
-        else:
-            raise ValueError(f"Unsupported operator {self.value}")
-
-
+        if self.value == '+':
+            return self.children[0].evaluate(st) + self.children[1].evaluate(st)
+        elif self.value == '-':
+            return self.children[0].evaluate(st) - self.children[1].evaluate(st)
+        elif self.value == '*':
+            return self.children[0].evaluate(st) * self.children[1].evaluate(st)
+        elif self.value == '/':
+            return self.children[0].evaluate(st) // self.children[1].evaluate(st)
+        elif self.value == '==':
+            return self.children[0].evaluate(st) == self.children[1].evaluate(st)
+        elif self.value == '>':
+            return self.children[0].evaluate(st) > self.children[1].evaluate(st)
+        elif self.value == '<':
+            return self.children[0].evaluate(st) < self.children[1].evaluate(st)
+        elif self.value == 'or':
+            return self.children[0].evaluate(st) or self.children[1].evaluate(st)
+        elif self.value == 'and':
+            return self.children[0].evaluate(st) and self.children[1].evaluate(st) 
+        
 class UnOp(Node):
     def __init__(self, value, children):
         super().__init__(value, children)
 
     def evaluate(self, st):
-        val, typ = self.children[0].evaluate(st)
-        if typ != 'int':
-            raise TypeError("Mismatched types in unary operation")
         if self.value == '+':
-            return (val, typ)
+            return self.children[0].evaluate(st)
         elif self.value == '-':
-            return (-val, typ)
-        elif self.value == 'not':
-            return (not val, typ)
-
+            return -self.children[0].evaluate(st)
+        
 class IntVal(Node):
     def __init__(self, value):
         super().__init__(value, [])
 
     def evaluate(self, st):
-        return (self.value, 'int')
-
-class StringVal(Node):
-    def __init__(self, value):
-        super().__init__(value, [])
-
-    def evaluate(self, st):
-        return (self.value, 'string')
-
+        return self.value
+    
 class NoOp(Node):
     def __init__(self):
         super().__init__(None, [])
 
     def evaluate(self, st):
-        return (None, 'void')
+        pass
 
 class Block(Node):
     def __init__(self, children):
@@ -220,56 +150,56 @@ class Identifier(Node):
 
     def evaluate(self, st):
         return st.getter(self.value)
-
+    
 class Assignment(Node):
     def __init__(self, children):
         super().__init__(None, children)
 
     def evaluate(self, st):
-        if self.children[0].value in st.table:
-            var_name = self.children[0].value
-            value, typ = self.children[1].evaluate(st)
-            st.setter(var_name, value, typ)
-        else:
-            raise ValueError(f"Variable {self.children[0].value} not declared")
-
-class VarDec(Node):
-    def __init__(self, children):
-        super().__init__(None, children)
-
-    def evaluate(self, st):
-        var_name = self.children[0].value
-        value, typ = self.children[1].evaluate(st)
-        st.setter(var_name, value, typ)
+        st.setter(self.children[0].value, self.children[1].evaluate(st))
 
 class Print(Node):
     def __init__(self, children):
         super().__init__(None, children)
 
     def evaluate(self, st):
-        value, typ = self.children[0].evaluate(st)
-        print(value)
-
+        print(self.children[0].evaluate(st))
+        
 class While(Node):
     def __init__(self, children):
         super().__init__(None, children)
 
     def evaluate(self, st):
-        while self.children[0].evaluate(st)[0]:
+        while self.children[0].evaluate(st):
             for child in self.children[1]:
                 child.evaluate(st)
-
+            
 class If(Node):
     def __init__(self, children):
         super().__init__(None, children)
 
     def evaluate(self, st):
-        condition, _ = self.children[0].evaluate(st)
-        if condition:
+        if self.children[0].evaluate(st):
             self.children[1].evaluate(st)
         else:
             self.children[2].evaluate(st)
 
+class Read(Node):
+    def __init__(self, children):
+        super().__init__(None, children)
+
+    def evaluate(self, st):
+        return self.children[0]
+
+class SymbolTable:
+    def __init__(self):
+        self.table = {}
+
+    def setter(self, key, value):
+        self.table[key] = value
+
+    def getter(self, key):
+        return self.table[key]
 
 class Parser:
     
@@ -306,27 +236,7 @@ class Parser:
     
     @staticmethod
     def parseStatement(tokenizer):
-        if tokenizer.next.type == 'LOCAL':
-            tokenizer.selectNext()
-            if tokenizer.next.type != 'IDENTIFIER':
-                sys.stderr.write(f"Expected identifier\n")
-                sys.exit(1)
-            identifier = Identifier(tokenizer.next.value)
-            tokenizer.selectNext()
-            if tokenizer.next.type != 'ASSIGN' and tokenizer.next.type != 'EOF' and tokenizer.next.type != 'NEWLINE':
-                sys.stderr.write(f"error\n")
-                sys.exit(1)
-            if tokenizer.next.type == 'ASSIGN':
-                tokenizer.selectNext()
-                expression = Parser.boolExpression(tokenizer)
-                if tokenizer.next.type != 'EOF' and tokenizer.next.type != 'NEWLINE':
-                    sys.stderr.write(f"Expected \\n\n")
-                    sys.exit(1)
-                tokenizer.selectNext()
-                return VarDec([identifier, expression])
-            else:
-                return VarDec([identifier, NoOp()])
-        elif tokenizer.next.type == 'IDENTIFIER':
+        if tokenizer.next.type == 'IDENTIFIER':
             identifier = Identifier(tokenizer.next.value)
             tokenizer.selectNext()
             if tokenizer.next.type != 'ASSIGN':
@@ -433,16 +343,13 @@ class Parser:
     @staticmethod
     def parseExpression(tokenizer):
         result = Parser.parseTerm(tokenizer)
-        while tokenizer.next.type in ['PLUS', 'MINUS', 'CONCAT']:
+        while tokenizer.next.type in ['PLUS', 'MINUS']:
             if tokenizer.next.type == 'PLUS':
                 tokenizer.selectNext()
                 result = BinOp('+', [result, Parser.parseTerm(tokenizer)])
             elif tokenizer.next.type == 'MINUS':
                 tokenizer.selectNext()
                 result = BinOp('-', [result, Parser.parseTerm(tokenizer)])
-            elif tokenizer.next.type == 'CONCAT':
-                tokenizer.selectNext()
-                result = BinOp('..', [result, Parser.parseTerm(tokenizer)])
         return result
 
     @staticmethod
@@ -463,10 +370,6 @@ class Parser:
             result = tokenizer.next.value
             tokenizer.selectNext()
             return IntVal(result)
-        elif tokenizer.next.type == 'STRING':
-            result = tokenizer.next.value
-            tokenizer.selectNext()
-            return StringVal(result)
         elif tokenizer.next.type == 'IDENTIFIER':
             result = tokenizer.next.value
             tokenizer.selectNext()

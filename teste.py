@@ -313,19 +313,16 @@ class Parser:
                 sys.exit(1)
             identifier = Identifier(tokenizer.next.value)
             tokenizer.selectNext()
-            if tokenizer.next.type != 'ASSIGN' and tokenizer.next.type != 'EOF' and tokenizer.next.type != 'NEWLINE':
-                sys.stderr.write(f"error\n")
+            if tokenizer.next.type != 'ASSIGN':
+                sys.stderr.write(f"Expected =\n")
                 sys.exit(1)
-            if tokenizer.next.type == 'ASSIGN':
-                tokenizer.selectNext()
-                expression = Parser.boolExpression(tokenizer)
-                if tokenizer.next.type != 'EOF' and tokenizer.next.type != 'NEWLINE':
-                    sys.stderr.write(f"Expected \\n\n")
-                    sys.exit(1)
-                tokenizer.selectNext()
-                return VarDec([identifier, expression])
-            else:
-                return VarDec([identifier, NoOp()])
+            tokenizer.selectNext()
+            expression = Parser.parseExpression(tokenizer)
+            if tokenizer.next.type != 'EOF' and tokenizer.next.type != 'NEWLINE':
+                sys.stderr.write(f"Expected \\n\n")
+                sys.exit(1)
+            tokenizer.selectNext()
+            return VarDec([identifier, expression])
         elif tokenizer.next.type == 'IDENTIFIER':
             identifier = Identifier(tokenizer.next.value)
             tokenizer.selectNext()
