@@ -157,11 +157,11 @@ class BinOp(Node):
             if left_type != right_type:
                 raise TypeError(f"Comparison operations require matching types, got {left_type} and {right_type}")
             if self.value == '==':
-                return (left_val == right_val, 'int')
+                return (int(left_val == right_val), 'int')
             elif self.value == '>':
-                return (left_val > right_val, 'int')
+                return (int(left_val > right_val), 'int')
             elif self.value == '<':
-                return (left_val < right_val, 'int')
+                return (int(left_val < right_val), 'int')
 
         elif self.value == '..':
             return (str(left_val) + str(right_val), 'string')
@@ -204,7 +204,7 @@ class NoOp(Node):
         super().__init__(None, [])
 
     def evaluate(self, st):
-        return (None, 'void')
+        return (None, 'Null')
 
 class Block(Node):
     def __init__(self, children):
@@ -268,11 +268,20 @@ class If(Node):
     def evaluate(self, st):
         condition, _ = self.children[0].evaluate(st)
         if condition:
-            self.children[1].evaluate(st)
+            for stmt in self.children[1]:
+                stmt.evaluate(st)
         else:
-            self.children[2].evaluate(st)
+            for stmt in self.children[2]:
+                stmt.evaluate(st)
 
-
+            
+class Read(Node):
+    def __init__(self, children):
+        super().__init__(None, children)
+        
+    def evaluate(self, st):
+        return (self.children[0], 'int')
+    
 class Parser:
     
     @staticmethod
@@ -394,7 +403,10 @@ class Parser:
                 sys.stderr.write(f"Expected \\n\n")
                 sys.exit(1)
             tokenizer.selectNext()
-            statement1 = Parser.parseStatement(tokenizer)
+            statement1 = []
+            while tokenizer.next.type != 'ELSE' and tokenizer.next.type != 'END':
+                statement = Parser.parseStatement(tokenizer)
+                statement1.append(statement)
             if tokenizer.next.type != 'ELSE' and tokenizer.next.type != 'END':
                 sys.stderr.write(f"Expected else\n")
                 sys.exit(1)
@@ -404,7 +416,10 @@ class Parser:
                     sys.stderr.write(f"Expected \\n\n")
                     sys.exit(1)
                 tokenizer.selectNext()
-                statement2 = Parser.parseStatement(tokenizer)
+                statement2 = []
+                while tokenizer.next.type != 'END':
+                    statement = Parser.parseStatement(tokenizer)
+                    statement2.append(statement)
                 if tokenizer.next.type != 'END':
                     sys.stderr.write(f"Expected end\n")
                     sys.exit(1)
@@ -418,7 +433,7 @@ class Parser:
                 if tokenizer.next.type != 'EOF' and tokenizer.next.type != 'NEWLINE':
                     sys.stderr.write(f"Expected \\n\n")
                     sys.exit(1)
-                return If([expression, statement1, NoOp()])
+                return If([expression, statement1, []])
         else:
             sys.stderr.write(f"Expected identifier or print\n")
             sys.exit(1)
