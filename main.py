@@ -238,6 +238,8 @@ class VarDec(Node):
         super().__init__(None, children)
 
     def evaluate(self, st):
+        if self.children[0].value in st.table:
+            raise ValueError(f"Variable {self.children[0].value} already declared")
         var_name = self.children[0].value
         value, typ = self.children[1].evaluate(st)
         st.setter(var_name, value, typ)
