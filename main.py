@@ -337,7 +337,7 @@ class If(Node):
         super().__init__(None, children)
 
     def evaluate(self, st):
-        condition, _, shift = self.children[0].evaluate(st)
+        condition, _ = self.children[0].evaluate(st)
         AssemblyGenerator.add("CMP EAX, 0")
         AssemblyGenerator.add(f"JE ELSE_{If.i}")
         for stmt in self.children[1]:
