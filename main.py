@@ -277,16 +277,19 @@ class Assignment(Node):
         super().__init__(None, children)
 
     def evaluate(self, st):
-        if self.children[0].value in st.table:
-            var_name = self.children[0].value
+        var_name = self.children[0].value
+        if var_name in st.table:
+            value, typ = None, None  # Initialize value and type
             try:
-                value, typ = self.children[1].evaluate(st)
-            except:
-                print(entrada)
+                value, typ = self.children[1].evaluate(st)  # Attempt to evaluate the expression
+            except Exception as e:
+                sys.stderr.write(str(e) + "\n")  # Optionally, handle the exception e.g., log it
+                return  # Return from the method or handle the error as appropriate
             st.setter(var_name, value, typ)
             AssemblyGenerator.add(f"MOV [EBP - {st.getter(var_name)[2]}], EAX")
         else:
-            raise ValueError(f"Variable {self.children[0].value} not declared")
+            raise ValueError(f"Variable {var_name} not declared")
+
 
 class VarDec(Node):
     def __init__(self, children):
