@@ -2,6 +2,9 @@ import sys
 from abc import abstractmethod
 import re
 
+# pege o codigo de entrada
+entrada = sys.argv[1]
+
 class AssemblyGenerator:
     code = []  # Class variable to hold the assembly code for all instances
 
@@ -276,7 +279,10 @@ class Assignment(Node):
     def evaluate(self, st):
         if self.children[0].value in st.table:
             var_name = self.children[0].value
-            value, typ = self.children[1].evaluate(st)
+            try:
+                value, typ = self.children[1].evaluate(st)
+            except:
+                print(entrada)
             st.setter(var_name, value, typ)
             AssemblyGenerator.add(f"MOV [EBP - {st.getter(var_name)[2]}], EAX")
         else:
