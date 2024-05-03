@@ -1,11 +1,12 @@
-local i
-local n
-local f
-n = read()
-f = 1
-i = 2
-while i < n + 1 do
-f = f * i
-i = i + 1
+local x
+local y
+
+x = 10
+y = 20
+
+if x > y then
+    x = x + 1
+    print(x)
+else
+    print(y)
 end
-print(f)

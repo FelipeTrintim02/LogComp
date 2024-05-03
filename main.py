@@ -2,20 +2,19 @@ import sys
 from abc import abstractmethod
 import re
 
-# pege o codigo de entrada
-entrada = sys.argv[1]
-
 class AssemblyGenerator:
-    code = []  # Class variable to hold the assembly code for all instances
+    code = []  
 
     @classmethod
     def add(cls, line):
+        if not isinstance(line, str):
+            line = str(line)
         cls.code.append(line + "\n")
         
     @classmethod
     def get_code(cls):
         return ''.join(cls.code)
-        
+    
 class Token:
     def __init__(self, type, value):
         self.type = type
@@ -285,7 +284,6 @@ class Assignment(Node):
         else:
             raise ValueError(f"Variable {var_name} not declared")
 
-
 class VarDec(Node):
     def __init__(self, children):
         super().__init__(None, children)
@@ -304,7 +302,8 @@ class Print(Node):
         super().__init__(None, children)
 
     def evaluate(self, st):
-        value, typ, shift = self.children[0].evaluate(st)
+        value, typ, *shift = self.children[0].evaluate(st)
+        y = shift[0] if shift else None
         AssemblyGenerator.add(f"PUSH EAX")
         AssemblyGenerator.add(f"PUSH formatout")
         AssemblyGenerator.add(f"CALL printf")
@@ -312,49 +311,70 @@ class Print(Node):
         print(value)
 
 class While(Node):
+    counter = 0
+
     def __init__(self, children):
         super().__init__(None, children)
-        print(While.i)
+        self.while_id = While.newId()
+
+    @staticmethod
+    def newId():
+        While.counter += 1
+        return While.counter
 
     def evaluate(self, st):
-        start_label =f"LOOP_{While.i}"  
-        end_label = f"EXIT_{While.i}"
+        start_label = f"LOOP_{self.while_id}"
+        end_label = f"EXIT_{self.while_id}"
         
-        AssemblyGenerator.add(start_label+":")
-        self.children[0].evaluate(st)[0]
-        AssemblyGenerator.add("CMP EAX, False")
-        AssemblyGenerator.add(f"JE {end_label}")
-        
-        # while self.children[0].evaluate(st)[0]:
-        for child in self.children[1]:
-            child.evaluate(st)
-            
-        AssemblyGenerator.add(f"JMP {start_label}")
-        AssemblyGenerator.add(end_label+":")
+        AssemblyGenerator.add(f"{start_label}:")
+        self.children[0].evaluate(st)
+        AssemblyGenerator.add("CMP EAX, False") 
+        AssemblyGenerator.add(f"JE {end_label}")  
+        while self.children[0].evaluate(st)[0]:
+            for child in self.children[1]:
+                child.evaluate(st)
+        AssemblyGenerator.add(f"JMP {start_label}") 
+        AssemblyGenerator.add(f"{end_label}:")
 
 class If(Node):
     def __init__(self, children):
+        # Expected children layout: [condition, if_block, else_block (optional)]
         super().__init__(None, children)
 
     def evaluate(self, st):
         condition, _ = self.children[0].evaluate(st)
-        if len(self.children) == 2:
-            AssemblyGenerator.add("CMP EAX, False")
-            AssemblyGenerator.add(f"JE EXIT_{If.i}")
+        
+        if condition:
             for stmt in self.children[1]:
                 stmt.evaluate(st)
-            AssemblyGenerator.add(f"EXIT_{If.i}:")
-        else:
-            AssemblyGenerator.add("CMP EAX, False")
-            AssemblyGenerator.add(f"JE ELSE_{If.i}")
-            for stmt in self.children[1]:
-                stmt.evaluate(st)
-            AssemblyGenerator.add(f"JMP EXIT_{If.i}")
-            AssemblyGenerator.add(f"ELSE_{If.i}:")
+        elif len(self.children) > 2:
             for stmt in self.children[2]:
                 stmt.evaluate(st)
-            AssemblyGenerator.add(f"EXIT_{If.i}:")
-         
+
+    def generate_assembly(self):
+        label_else = f"ELSE_{Node.newId()}"
+        label_end = f"END_IF_{Node.newId()}"
+
+        # Condition
+        condition_code = self.children[0].generate_assembly()
+        AssemblyGenerator.add(condition_code)
+        AssemblyGenerator.add(f"CMP EAX, 0")  # Check if the condition is false
+        AssemblyGenerator.add(f"JE {label_else}")  # Jump to else if false
+
+        # If block
+        if_code = '\n'.join([stmt.generate_assembly() for stmt in self.children[1]])
+        AssemblyGenerator.add(if_code)
+        AssemblyGenerator.add(f"JMP {label_end}")  # Skip else block
+
+        # Else block
+        if len(self.children) > 2:
+            AssemblyGenerator.add(f"{label_else}:")
+            else_code = '\n'.join([stmt.generate_assembly() for stmt in self.children[2]])
+            AssemblyGenerator.add(else_code)
+
+        # End label
+        AssemblyGenerator.add(f"{label_end}:")
+
 class Read(Node):
     def __init__(self, children):
         super().__init__(None, children)
