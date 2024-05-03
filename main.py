@@ -278,7 +278,8 @@ class Assignment(Node):
     def evaluate(self, st):
         var_name = self.children[0].value
         if var_name in st.table:
-            value, typ = self.children[1].evaluate(st)
+            value, typ, *resto = self.children[1].evaluate(st)
+            x = resto[0] if resto else None
             st.setter(var_name, value, typ)
             AssemblyGenerator.add(f"MOV [EBP - {st.getter(var_name)[2]}], EAX")
         else:
