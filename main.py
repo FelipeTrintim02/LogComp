@@ -338,15 +338,22 @@ class If(Node):
 
     def evaluate(self, st):
         condition, _ = self.children[0].evaluate(st)
-        AssemblyGenerator.add("CMP EAX, 0")
-        AssemblyGenerator.add(f"JE ELSE_{If.i}")
-        for stmt in self.children[1]:
-            stmt.evaluate(st)
-        AssemblyGenerator.add(f"JMP EXIT_{If.i}")
-        AssemblyGenerator.add(f"ELSE_{If.i}:")
-        for stmt in self.children[2]:
-            stmt.evaluate(st)
-        AssemblyGenerator.add(f"EXIT_{If.i}:")
+        if len(self.children) == 2:
+            AssemblyGenerator.add("CMP EAX, False")
+            AssemblyGenerator.add(f"JE EXIT_{If.i}")
+            for stmt in self.children[1]:
+                stmt.evaluate(st)
+            AssemblyGenerator.add(f"EXIT_{If.i}:")
+        else:
+            AssemblyGenerator.add("CMP EAX, False")
+            AssemblyGenerator.add(f"JE ELSE_{If.i}")
+            for stmt in self.children[1]:
+                stmt.evaluate(st)
+            AssemblyGenerator.add(f"JMP EXIT_{If.i}")
+            AssemblyGenerator.add(f"ELSE_{If.i}:")
+            for stmt in self.children[2]:
+                stmt.evaluate(st)
+            AssemblyGenerator.add(f"EXIT_{If.i}:")
          
 class Read(Node):
     def __init__(self, children):
