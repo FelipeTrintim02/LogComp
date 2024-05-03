@@ -163,9 +163,11 @@ class BinOp(Node):
         super().__init__(value, children)
 
     def evaluate(self, st):
-        right_val, right_type = self.children[1].evaluate(st)
+        right_val, right_type, *rest = self.children[1].evaluate(st)
+        x = rest[0] if rest else None
         AssemblyGenerator.add(f"PUSH EAX")
-        left_val, left_type = self.children[0].evaluate(st)
+        left_val, left_type, *resto = self.children[0].evaluate(st)
+        y = resto[0] if resto else None
         AssemblyGenerator.add(f"POP EBX")
         
         
@@ -196,18 +198,15 @@ class BinOp(Node):
                 raise TypeError(f"Comparison operations require matching types, got {left_type} and {right_type}")
             if self.value == '==':
                 AssemblyGenerator.add(f"CMP EAX, EBX")
-                AssemblyGenerator.add(f"SETE AL")
-                AssemblyGenerator.add(f"MOVZX EAX, AL")
+                AssemblyGenerator.add(f"CALL binop_je")
                 return [int(left_val == right_val), 'int']
             elif self.value == '>':
                 AssemblyGenerator.add(f"CMP EAX, EBX")
-                AssemblyGenerator.add(f"SETG AL")
-                AssemblyGenerator.add(f"MOVZX EAX, AL")
+                AssemblyGenerator.add(f"CALL binop_jg")
                 return [int(left_val > right_val), 'int']
             elif self.value == '<':
                 AssemblyGenerator.add(f"CMP EAX, EBX")
-                AssemblyGenerator.add(f"SETL AL")
-                AssemblyGenerator.add(f"MOVZX EAX, AL")
+                AssemblyGenerator.add(f"CALL binop_jl")
                 return [int(left_val < right_val), 'int']
             
         elif self.value == '..':
@@ -279,8 +278,7 @@ class Assignment(Node):
     def evaluate(self, st):
         var_name = self.children[0].value
         if var_name in st.table:
-            value, typ = None, None
-            value, typ = self.children[1].evaluate(st)  
+            value, typ = self.children[1].evaluate(st)
             st.setter(var_name, value, typ)
             AssemblyGenerator.add(f"MOV [EBP - {st.getter(var_name)[2]}], EAX")
         else:
@@ -323,7 +321,7 @@ class While(Node):
         
         AssemblyGenerator.add(start_label+":")
         self.children[0].evaluate(st)[0]
-        AssemblyGenerator.add("CMP EAX, 0")
+        AssemblyGenerator.add("CMP EAX, False")
         AssemblyGenerator.add(f"JE {end_label}")
         
         # while self.children[0].evaluate(st)[0]:
