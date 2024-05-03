@@ -2,17 +2,6 @@ import sys
 from abc import abstractmethod
 import re
 
-class AssemblyGenerator:
-    code = []  # Class variable to hold the assembly code for all instances
-
-    @classmethod
-    def add(cls, line):
-        cls.code.append(line + "\n")
-        
-    @classmethod
-    def get_code(cls):
-        return ''.join(cls.code)
-        
 class Token:
     def __init__(self, type, value):
         self.type = type
@@ -122,35 +111,20 @@ class Tokenizer:
 class SymbolTable:
     def __init__(self):
         self.table = {}
-        self.shift = 0
 
     def setter(self, key, value, typ):
-        self.table[key][0] = value
-        self.table[key][1] = typ
+        self.table[key] = (value, typ)
 
     def getter(self, key):
         if key in self.table:
             return self.table[key]
         else:
             raise ValueError(f"Variable {key} not declared")
-        
-    def create(self, key):
-        if key not in self.table:
-            self.shift += 4
-            self.table[key] = [None, None, self.shift]
-        else:
-            raise ValueError(f"Variable {key} already declared")
 
 class Node:
-    i = 0
     def __init__(self, value, children):
         self.value = value
         self.children = children
-        self.id = Node.newId()
-        
-    def newId():
-        Node.i += 1
-        return Node.i
 
     def evaluate(self, st):
         raise NotImplementedError("Must override evaluate")
@@ -160,58 +134,41 @@ class BinOp(Node):
         super().__init__(value, children)
 
     def evaluate(self, st):
-        right_val, right_type = self.children[1].evaluate(st)
-        AssemblyGenerator.add(f"PUSH EAX")
         left_val, left_type = self.children[0].evaluate(st)
-        AssemblyGenerator.add(f"POP EBX")
-        
-        
+        right_val, right_type = self.children[1].evaluate(st)
+
         if self.value in {'+', '-', '*', '/', 'and', 'or'}:
             if left_type != 'int' or right_type != 'int':
                 raise TypeError(f"Arithmetic operations require integer types, got {left_type} and {right_type}")
             if self.value == '+':
-                AssemblyGenerator.add(f"ADD EAX, EBX")
-                return [left_val + right_val, 'int']
+                return (left_val + right_val, 'int')
             elif self.value == '-':
-                AssemblyGenerator.add(f"SUB EAX, EBX")
-                return [left_val - right_val, 'int']
+                return (left_val - right_val, 'int')
             elif self.value == '*':
-                AssemblyGenerator.add(f"IMUL EAX, EBX")
-                return [left_val * right_val, 'int']
+                return (left_val * right_val, 'int')
             elif self.value == '/':
-                AssemblyGenerator.add(f"IDIV EBX")
-                return [left_val // right_val, 'int']
+                return (left_val // right_val, 'int')
             elif self.value == 'and':
-                AssemblyGenerator.add(f"AND EAX, EBX")
-                return [left_val and right_val, 'int']
+                return (left_val and right_val, 'int')
             elif self.value == 'or':
-                AssemblyGenerator.add(f"OR EAX, EBX")
-                return [left_val or right_val, 'int']
+                return (left_val or right_val, 'int')
 
         elif self.value in {'==', '>', '<'}:
             if left_type != right_type:
                 raise TypeError(f"Comparison operations require matching types, got {left_type} and {right_type}")
             if self.value == '==':
-                AssemblyGenerator.add(f"CMP EAX, EBX")
-                AssemblyGenerator.add(f"SETE AL")
-                AssemblyGenerator.add(f"MOVZX EAX, AL")
-                return [int(left_val == right_val), 'int']
+                return (int(left_val == right_val), 'int')
             elif self.value == '>':
-                AssemblyGenerator.add(f"CMP EAX, EBX")
-                AssemblyGenerator.add(f"SETG AL")
-                AssemblyGenerator.add(f"MOVZX EAX, AL")
-                return [int(left_val > right_val), 'int']
+                return (int(left_val > right_val), 'int')
             elif self.value == '<':
-                AssemblyGenerator.add(f"CMP EAX, EBX")
-                AssemblyGenerator.add(f"SETL AL")
-                AssemblyGenerator.add(f"MOVZX EAX, AL")
-                return [int(left_val < right_val), 'int']
-            
+                return (int(left_val < right_val), 'int')
+
         elif self.value == '..':
-            return [str(left_val) + str(right_val), 'string']
+            return (str(left_val) + str(right_val), 'string')
 
         else:
             raise ValueError(f"Unsupported operator {self.value}")
+
 
 class UnOp(Node):
     def __init__(self, value, children):
@@ -222,35 +179,32 @@ class UnOp(Node):
         if typ != 'int':
             raise TypeError("Mismatched types in unary operation")
         if self.value == '+':
-            return [val, typ]
+            return (val, typ)
         elif self.value == '-':
-            AssemblyGenerator.add(f"NEG EAX")
-            return [-val, typ]
+            return (-val, typ)
         elif self.value == 'not':
-            AssemblyGenerator.add(f"NOT EAX")
-            return [not val, typ]
+            return (not val, typ)
 
 class IntVal(Node):
     def __init__(self, value):
         super().__init__(value, [])
 
     def evaluate(self, st):
-        AssemblyGenerator.add(f"MOV EAX, {self.value}")
-        return [self.value, 'int']
+        return (self.value, 'int')
 
 class StringVal(Node):
     def __init__(self, value):
         super().__init__(value, [])
 
     def evaluate(self, st):
-        return [self.value, 'string']
+        return (self.value, 'string')
 
 class NoOp(Node):
     def __init__(self):
         super().__init__(None, [])
 
     def evaluate(self, st):
-        return [None, 'Null']
+        return (None, 'Null')
 
 class Block(Node):
     def __init__(self, children):
@@ -258,15 +212,13 @@ class Block(Node):
 
     def evaluate(self, st):
         for child in self.children:
-            if child is not None: 
-                child.evaluate(st)
+            child.evaluate(st)
 
 class Identifier(Node):
     def __init__(self, value):
         super().__init__(value, [])
 
     def evaluate(self, st):
-        AssemblyGenerator.add(f"MOV EAX, [EBP - {st.getter(self.value)[2]}]")
         return st.getter(self.value)
 
 class Assignment(Node):
@@ -278,7 +230,6 @@ class Assignment(Node):
             var_name = self.children[0].value
             value, typ = self.children[1].evaluate(st)
             st.setter(var_name, value, typ)
-            AssemblyGenerator.add(f"MOV [EBP - {st.getter(var_name)[2]}], EAX")
         else:
             raise ValueError(f"Variable {self.children[0].value} not declared")
 
@@ -287,74 +238,49 @@ class VarDec(Node):
         super().__init__(None, children)
 
     def evaluate(self, st):
-        st.create(self.children[0].value)
-        if len(self.children) > 1:
-            value, typ = self.children[1].evaluate(st)
-            st.setter(self.children[0].value, value, typ)
-        else:
-            st.setter(self.children[0].value, None, None)
-        AssemblyGenerator.add("PUSH DWORD 0")
+        if self.children[0].value in st.table:
+            raise ValueError(f"Variable {self.children[0].value} already declared")
+        var_name = self.children[0].value
+        value, typ = self.children[1].evaluate(st)
+        st.setter(var_name, value, typ)
 
 class Print(Node):
     def __init__(self, children):
         super().__init__(None, children)
 
     def evaluate(self, st):
-        value, typ, shift = self.children[0].evaluate(st)
-        AssemblyGenerator.add(f"PUSH EAX")
-        AssemblyGenerator.add(f"PUSH formatout")
-        AssemblyGenerator.add(f"CALL printf")
-        AssemblyGenerator.add(f"ADD ESP, 8")
+        value, typ = self.children[0].evaluate(st)
         print(value)
 
 class While(Node):
     def __init__(self, children):
         super().__init__(None, children)
-        print(While.i)
 
     def evaluate(self, st):
-        start_label =f"LOOP_{While.i}"  
-        end_label = f"EXIT_{While.i}"
-        
-        AssemblyGenerator.add(start_label+":")
-        self.children[0].evaluate(st)[0]
-        AssemblyGenerator.add("CMP EAX, 0")
-        AssemblyGenerator.add(f"JE {end_label}")
-        
-        # while self.children[0].evaluate(st)[0]:
-        for child in self.children[1]:
-            child.evaluate(st)
-            
-        AssemblyGenerator.add(f"JMP {start_label}")
-        AssemblyGenerator.add(end_label+":")
+        while self.children[0].evaluate(st)[0]:
+            for child in self.children[1]:
+                child.evaluate(st)
 
 class If(Node):
     def __init__(self, children):
         super().__init__(None, children)
 
     def evaluate(self, st):
-        condition, _, shift = self.children[0].evaluate(st)
-        AssemblyGenerator.add("CMP EAX, 0")
-        AssemblyGenerator.add(f"JE ELSE_{If.i}")
-        for stmt in self.children[1]:
-            stmt.evaluate(st)
-        AssemblyGenerator.add(f"JMP EXIT_{If.i}")
-        AssemblyGenerator.add(f"ELSE_{If.i}:")
-        for stmt in self.children[2]:
-            stmt.evaluate(st)
-        AssemblyGenerator.add(f"EXIT_{If.i}:")
-         
+        condition, _ = self.children[0].evaluate(st)
+        if condition:
+            for stmt in self.children[1]:
+                stmt.evaluate(st)
+        else:
+            for stmt in self.children[2]:
+                stmt.evaluate(st)
+
+            
 class Read(Node):
     def __init__(self, children):
         super().__init__(None, children)
         
     def evaluate(self, st):
-        AssemblyGenerator.add("PUSH scanint")
-        AssemblyGenerator.add("PUSH formatin")
-        AssemblyGenerator.add("CALL scanf")
-        AssemblyGenerator.add("ADD ESP, 8")
-        AssemblyGenerator.add("MOV EAX, DWORD [scanint]")
-        return [self.children[0], 'int']
+        return (self.children[0], 'int')
     
 class Parser:
     
@@ -623,20 +549,6 @@ if __name__ == "__main__":
         st = SymbolTable()
         code = PrePro.filter(code)
         result = Parser.run(code, st)
-        
-        # Prepare assembly code output
-        with open('cabecalho.txt', 'r') as header_file:
-            header_content = header_file.read()
-        with open('footer.txt', 'r') as footer_file:
-            footer_content = footer_file.read()
-        
-        assembly_code = header_content + "\n" + "\n" + AssemblyGenerator.get_code() + "\n" + footer_content
-        
-        # Save the final assembly code to a file
-        filename = filename.replace('.lua', '.asm')
-        with open(filename, 'w') as asm_file:
-            asm_file.write(assembly_code)
-        
     except FileNotFoundError:
         sys.stderr.write(f"Error: File {filename} not found\n")
         sys.exit(1)
