@@ -17,7 +17,7 @@ class Tokenizer:
         self.source = source
         self.position = 0
         self.next = None
-        self.reserved = ['print', 'read', 'if', 'then', 'else', 'end', 'while', 'do', 'or', 'and', 'not', 'local', 'function', 'return']
+        self.reserved = ['print', 'read', 'if', 'then', 'else', 'end', 'while', 'do', 'or', 'and', 'not', 'local']
 
     def selectNext(self):
         while self.position < len(self.source) and self.source[self.position].isspace():
@@ -104,9 +104,6 @@ class Tokenizer:
             else:
                 raise Exception("String literal not closed")
             self.next = Token('STRING', string_literal)
-        elif self.source[self.position] == ",":
-            self.next = Token("COMMA", None)
-            self.position += 1
         else:
             sys.stderr.write(f"Unexpected character: {self.source[self.position]}\n")
             sys.exit(1)
@@ -123,35 +120,22 @@ class SymbolTable:
             return self.table[key]
         else:
             raise ValueError(f"Variable {key} not declared")
-        
-class FuncTable:
-    def __init__(self):
-        self.table = {}
-
-    def setter(self, name, node):
-        self.table[name] = node
-
-    def getter(self, name):
-        if name in self.table:
-            return self.table[name]
-        else:
-            raise ValueError(f"Function {name} not declared")
 
 class Node:
     def __init__(self, value, children):
         self.value = value
         self.children = children
 
-    def evaluate(self, st, ft):
+    def evaluate(self, st):
         raise NotImplementedError("Must override evaluate")
 
 class BinOp(Node):
     def __init__(self, value, children):
         super().__init__(value, children)
 
-    def evaluate(self, st, ft):
-        left_val, left_type = self.children[0].evaluate(st, ft)
-        right_val, right_type = self.children[1].evaluate(st, ft)
+    def evaluate(self, st):
+        left_val, left_type = self.children[0].evaluate(st)
+        right_val, right_type = self.children[1].evaluate(st)
 
         if self.value in {'+', '-', '*', '/', 'and', 'or'}:
             if left_type != 'int' or right_type != 'int':
@@ -185,12 +169,13 @@ class BinOp(Node):
         else:
             raise ValueError(f"Unsupported operator {self.value}")
 
+
 class UnOp(Node):
     def __init__(self, value, children):
         super().__init__(value, children)
 
-    def evaluate(self, st, ft):
-        val, typ = self.children[0].evaluate(st, ft)
+    def evaluate(self, st):
+        val, typ = self.children[0].evaluate(st)
         if typ != 'int':
             raise TypeError("Mismatched types in unary operation")
         if self.value == '+':
@@ -204,48 +189,46 @@ class IntVal(Node):
     def __init__(self, value):
         super().__init__(value, [])
 
-    def evaluate(self, st, ft):
+    def evaluate(self, st):
         return (self.value, 'int')
 
 class StringVal(Node):
     def __init__(self, value):
         super().__init__(value, [])
 
-    def evaluate(self, st, ft):
+    def evaluate(self, st):
         return (self.value, 'string')
 
 class NoOp(Node):
     def __init__(self):
         super().__init__(None, [])
 
-    def evaluate(self, st, ft):
+    def evaluate(self, st):
         return (None, 'Null')
 
 class Block(Node):
     def __init__(self, children):
         super().__init__(None, children)
 
-    def evaluate(self, st, ft):
+    def evaluate(self, st):
         for child in self.children:
-            child.evaluate(st, ft)
-            if isinstance(child, Return):
-                return child.evaluate(st, ft)
+            child.evaluate(st)
 
 class Identifier(Node):
     def __init__(self, value):
         super().__init__(value, [])
 
-    def evaluate(self, st, ft):
+    def evaluate(self, st):
         return st.getter(self.value)
 
 class Assignment(Node):
     def __init__(self, children):
         super().__init__(None, children)
 
-    def evaluate(self, st, ft):
+    def evaluate(self, st):
         if self.children[0].value in st.table:
             var_name = self.children[0].value
-            value, typ = self.children[1].evaluate(st, ft)
+            value, typ = self.children[1].evaluate(st)
             st.setter(var_name, value, typ)
         else:
             raise ValueError(f"Variable {self.children[0].value} not declared")
@@ -254,86 +237,51 @@ class VarDec(Node):
     def __init__(self, children):
         super().__init__(None, children)
 
-    def evaluate(self, st, ft):
+    def evaluate(self, st):
         if self.children[0].value in st.table:
             raise ValueError(f"Variable {self.children[0].value} already declared")
         var_name = self.children[0].value
-        value, typ = self.children[1].evaluate(st, ft)
+        value, typ = self.children[1].evaluate(st)
         st.setter(var_name, value, typ)
 
 class Print(Node):
     def __init__(self, children):
         super().__init__(None, children)
 
-    def evaluate(self, st, ft):
-        value, typ = self.children[0].evaluate(st, ft)
+    def evaluate(self, st):
+        value, typ = self.children[0].evaluate(st)
         print(value)
 
 class While(Node):
     def __init__(self, children):
         super().__init__(None, children)
 
-    def evaluate(self, st, ft):
-        while self.children[0].evaluate(st, ft)[0]:
+    def evaluate(self, st):
+        while self.children[0].evaluate(st)[0]:
             for child in self.children[1]:
-                child.evaluate(st, ft)
+                child.evaluate(st)
 
 class If(Node):
     def __init__(self, children):
         super().__init__(None, children)
 
-    def evaluate(self, st, ft):
-        condition, _ = self.children[0].evaluate(st, ft)
+    def evaluate(self, st):
+        condition, _ = self.children[0].evaluate(st)
         if condition:
             for stmt in self.children[1]:
-                stmt.evaluate(st, ft)
+                stmt.evaluate(st)
         else:
             for stmt in self.children[2]:
-                stmt.evaluate(st, ft)
+                stmt.evaluate(st)
+
             
 class Read(Node):
     def __init__(self, children):
         super().__init__(None, children)
         
-    def evaluate(self, st, ft):
+    def evaluate(self, st):
         return (self.children[0], 'int')
     
-class FuncDec(Node):
-    def __init__(self, children):
-        super().__init__(None, children)
-        
-    def evaluate(self, st, ft):
-        func_name = self.children[0].value
-        ft.setter(func_name, self) 
-        
-class FuncCall(Node):
-    def __init__(self, children):
-        super().__init__(None, children)
-        
-    def evaluate(self, st, ft):
-        func_name = self.children[0].value
-        func_node = ft.getter(func_name)
-        args = self.children[1]
-        original_args = func_node.children[1]
-        
-        if len(func_node.children)-1 != len(self.children):
-            raise ValueError(f"Function {func_name} expected {len(func_node.children)-2} arguments, got {len(self.children)}")        
-
-        local_st = SymbolTable()
-
-        for i in range(0, len(args)):
-            value, typ = args[i].evaluate(st, ft)
-            local_st.setter(original_args[i].value, value, typ)
-            
-        return func_node.children[-1].evaluate(local_st, ft)
-            
-class Return(Node):
-    def __init__(self, children):
-        super().__init__(None, children)
-        
-    def evaluate(self, st, ft):
-        return self.children[0].evaluate(st, ft)
-
 class Parser:
     
     @staticmethod
@@ -369,7 +317,6 @@ class Parser:
     
     @staticmethod
     def parseStatement(tokenizer):
-        #LOCAL
         if tokenizer.next.type == 'LOCAL':
             tokenizer.selectNext()
             if tokenizer.next.type != 'IDENTIFIER':
@@ -390,41 +337,19 @@ class Parser:
                 return VarDec([identifier, expression])
             else:
                 return VarDec([identifier, NoOp()])
-            
-        #IDENTIFIER
         elif tokenizer.next.type == 'IDENTIFIER':
             identifier = Identifier(tokenizer.next.value)
             tokenizer.selectNext()
-            if tokenizer.next.type != 'ASSIGN' and tokenizer.next.type != 'LPAREN':
-                sys.stderr.write(f"Expected = or (\n")
+            if tokenizer.next.type != 'ASSIGN':
+                sys.stderr.write(f"Expected =\n")
                 sys.exit(1)
-            if tokenizer.next.type == 'LPAREN':
-                tokenizer.selectNext()
-                arguments = []
-                while tokenizer.next.type != 'RPAREN':
-                    expression = Parser.boolExpression(tokenizer)
-                    arguments.append(expression)
-                    if tokenizer.next.type == 'COMMA':
-                        tokenizer.selectNext()
-                if tokenizer.next.type != 'RPAREN':
-                    sys.stderr.write(f"Expected )\n")
-                    sys.exit(1)
-                tokenizer.selectNext()
-                if tokenizer.next.type != 'EOF' and tokenizer.next.type != 'NEWLINE':
-                    sys.stderr.write(f"Expected \\n\n")
-                    sys.exit(1)
-                tokenizer.selectNext()
-                return FuncCall([identifier, arguments])
-            elif tokenizer.next.type == 'ASSIGN':
-                tokenizer.selectNext()
-                expression = Parser.boolExpression(tokenizer)
-                if tokenizer.next.type != 'EOF' and tokenizer.next.type != 'NEWLINE':
-                    sys.stderr.write(f"Expected \\n\n")
-                    sys.exit(1)
-                tokenizer.selectNext()
-                return Assignment([identifier, expression])
-        
-        #PRINT
+            tokenizer.selectNext()
+            expression = Parser.boolExpression(tokenizer)
+            if tokenizer.next.type != 'EOF' and tokenizer.next.type != 'NEWLINE':
+                sys.stderr.write(f"Expected \\n\n")
+                sys.exit(1)
+            tokenizer.selectNext()
+            return Assignment([identifier, expression])
         elif tokenizer.next.type == 'PRINT':
             tokenizer.selectNext()
             if tokenizer.next.type != 'LPAREN':
@@ -441,13 +366,9 @@ class Parser:
                 sys.exit(1)
             tokenizer.selectNext() 
             return Print([expression])
-        
-        #NEWLINE
         elif tokenizer.next.type == 'NEWLINE':
             tokenizer.selectNext()
             return NoOp()
-        
-        #WHILE
         elif tokenizer.next.type == 'WHILE':
             tokenizer.selectNext()
             expression = Parser.boolExpression(tokenizer)
@@ -471,8 +392,6 @@ class Parser:
                 sys.stderr.write(f"Expected \\n\n")
                 sys.exit(1)
             return While([expression, statements])
-        
-        #IF
         elif tokenizer.next.type == 'IF':
             tokenizer.selectNext()
             expression = Parser.boolExpression(tokenizer)
@@ -515,60 +434,6 @@ class Parser:
                     sys.stderr.write(f"Expected \\n\n")
                     sys.exit(1)
                 return If([expression, statement1, []])
-            
-        #FUNCTION
-        elif tokenizer.next.type == 'FUNCTION':
-            tokenizer.selectNext()
-            if tokenizer.next.type != 'IDENTIFIER':
-                sys.stderr.write(f"Expected identifier\n")
-                sys.exit(1)
-            identifier = Identifier(tokenizer.next.value)
-            tokenizer.selectNext()
-            if tokenizer.next.type != 'LPAREN':
-                sys.stderr.write(f"Expected (\n")
-                sys.exit(1)
-            tokenizer.selectNext()
-            arguments = []
-            while tokenizer.next.type != 'RPAREN':
-                if tokenizer.next.type != 'IDENTIFIER':
-                    sys.stderr.write(f"Expected identifier\n")
-                    sys.exit(1)
-                arguments.append(Identifier(tokenizer.next.value))
-                tokenizer.selectNext()
-                if tokenizer.next.type == 'COMMA':
-                    tokenizer.selectNext()
-            if tokenizer.next.type != 'RPAREN':
-                sys.stderr.write(f"Expected )\n")
-                sys.exit(1)
-            tokenizer.selectNext()
-            if tokenizer.next.type != 'NEWLINE':
-                sys.stderr.write(f"Expected \\n\n")
-                sys.exit(1)
-            tokenizer.selectNext()
-            statements = []
-            while tokenizer.next.type != 'END':
-                statement = Parser.parseStatement(tokenizer)
-                statements.append(statement)
-            if tokenizer.next.type != 'END':
-                sys.stderr.write(f"Expected end\n")
-                sys.exit(1)
-            tokenizer.selectNext()
-            if tokenizer.next.type != 'EOF' and tokenizer.next.type != 'NEWLINE':
-                sys.stderr.write(f"Expected\\n\n")
-                sys.exit(1)
-            block = Block(statements)
-            return FuncDec([identifier, arguments, block])
-        
-        #RETURN
-        elif tokenizer.next.type == 'RETURN':
-            tokenizer.selectNext()
-            expression = Parser.boolExpression(tokenizer)
-            if tokenizer.next.type != 'EOF' and tokenizer.next.type != 'NEWLINE':
-                sys.stderr.write(f"Expected \\n\n")
-                sys.exit(1)
-            tokenizer.selectNext()
-            return Return([expression])
-        
         else:
             sys.stderr.write(f"Expected identifier or print\n")
             sys.exit(1)
@@ -622,21 +487,7 @@ class Parser:
         elif tokenizer.next.type == 'IDENTIFIER':
             result = tokenizer.next.value
             tokenizer.selectNext()
-            if tokenizer.next.type == 'LPAREN':
-                tokenizer.selectNext()
-                arguments = []
-                while tokenizer.next.type != 'RPAREN':
-                    expression = Parser.boolExpression(tokenizer)
-                    arguments.append(expression)
-                    if tokenizer.next.type == 'COMMA':
-                        tokenizer.selectNext()
-                if tokenizer.next.type != 'RPAREN':
-                    sys.stderr.write(f"Expected )\n")
-                    sys.exit(1)
-                tokenizer.selectNext()
-                return FuncCall([Identifier(result), arguments])
-            else:
-                return Identifier(result)
+            return Identifier(result)
         elif tokenizer.next.type == 'PLUS':
             tokenizer.selectNext()
             return UnOp('+', [Parser.parseFactor(tokenizer)])
@@ -650,7 +501,7 @@ class Parser:
             tokenizer.selectNext()
             result = Parser.boolExpression(tokenizer)
             if tokenizer.next.type != 'RPAREN':
-                sys.stderr.write(f"Expected )\n")
+                sys.stderr.write(f"Expected )aaaaaa\n")
                 sys.exit(1)
             tokenizer.selectNext()
             return result
@@ -666,16 +517,16 @@ class Parser:
             tokenizer.selectNext()
             return Read([int(input())])
         else:
-
             sys.stderr.write(f"Expected number or (expression)\n")
             sys.exit(1)
 
+
     @staticmethod
-    def run(code, st, ft):
+    def run(code, st):
         tokenizer = Tokenizer(code)
         tokenizer.selectNext()  # Initialize the tokenizer
         result = Parser.parseBlock(tokenizer)
-        result = result.evaluate(st, ft)
+        result = result.evaluate(st)
         if tokenizer.next.type != 'EOF':
             sys.stderr.write("Unexpected tokens after expression\n")
             sys.exit(1)
@@ -696,9 +547,8 @@ if __name__ == "__main__":
         with open(filename, 'r') as file:
             code = file.read()
         st = SymbolTable()
-        ft = FuncTable()
         code = PrePro.filter(code)
-        result = Parser.run(code, st, ft)
+        result = Parser.run(code, st)
     except FileNotFoundError:
         sys.stderr.write(f"Error: File {filename} not found\n")
         sys.exit(1)
